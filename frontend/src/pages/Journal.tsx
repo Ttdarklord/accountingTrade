@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { BookOpen, DollarSign, TrendingUp, TrendingDown, Users, Filter, Search } from 'lucide-react'
+import { BookOpen, DollarSign, TrendingUp, Users, Search } from 'lucide-react'
 import { api } from '../lib/api'
 
 interface JournalEntry {
@@ -45,7 +45,6 @@ export function Journal() {
   const [searchTerm, setSearchTerm] = useState('')
   const [accountFilter, setAccountFilter] = useState('')
   const [currencyFilter, setCurrencyFilter] = useState('')
-  const [dateRange, setDateRange] = useState('')
   const [activeTab, setActiveTab] = useState<'entries' | 'balances' | 'counterparties'>('entries')
   
   const { data: journalEntries, isLoading: entriesLoading } = useQuery<JournalEntry[]>({
@@ -56,15 +55,6 @@ export function Journal() {
   const { data: accountBalances, isLoading: balancesLoading } = useQuery<AccountBalance[]>({
     queryKey: ['account-balances'],
     queryFn: () => api.get('/journal/balances').then(res => res.data.data),
-  })
-
-  // Mock counterparty balances - this would be a real API endpoint
-  const { data: counterpartyBalances } = useQuery<CounterpartyBalance[]>({
-    queryKey: ['counterparty-balances'],
-    queryFn: async () => {
-      // This would be a real API call to get counterparty balances
-      return []
-    },
   })
 
   const formatCurrency = (amount: number, currency: string) => {

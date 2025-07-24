@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Filter, Info, TrendingUp, TrendingDown } from 'lucide-react'
+import { Plus, Search, Filter, TrendingUp } from 'lucide-react'
 import { api } from '../lib/api'
 
 interface Trade {
@@ -126,10 +126,6 @@ export function Trades() {
     }
     if (trade.status === 'CANCELLED') return 'Cancelled'
     return 'Pending'
-  }
-
-  const getSettlementProgress = (settled: number, total: number) => {
-    return total > 0 ? Math.min((settled / total) * 100, 100) : 0
   }
 
   const SettlementProgressBar = ({ trade }: { trade: Trade }) => {

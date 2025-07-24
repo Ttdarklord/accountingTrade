@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { TrendingUp, TrendingDown, Package, DollarSign, Plus, CheckCircle, Clock, AlertCircle } from 'lucide-react'
+import { TrendingUp, Package, DollarSign, Plus, CheckCircle, Clock, AlertCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 

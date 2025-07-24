@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Package, TrendingUp, DollarSign, TrendingDown } from 'lucide-react'
+import { Package, TrendingUp, DollarSign } from 'lucide-react'
 import { api } from '../lib/api'
 
 interface Position {

@@ -261,9 +261,8 @@ export default function Counterparts() {
         },
         margin: { left: margin, right: margin },
         tableWidth: 'wrap', // Let table adjust its width
-        didDrawPage: function(data: any) {
+        didDrawPage: function() {
           // This will be called for each page
-          const pageNumber = (doc as any).internal.getCurrentPageInfo().pageNumber
           // We'll update headers after we know total pages
         }
       })

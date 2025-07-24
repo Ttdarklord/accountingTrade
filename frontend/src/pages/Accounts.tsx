@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Edit, Trash2, CreditCard, Building, Users, Filter, Eye, X, User, Globe, Hash, ToggleLeft, ToggleRight, Download, Calendar } from 'lucide-react'
+import { Plus, Search, Edit, CreditCard, Building, Users, Filter, Eye, X, User, Globe, Hash, ToggleRight, Download, Calendar } from 'lucide-react'
 import { api } from '../lib/api'
 
 interface BankAccount {
@@ -255,7 +255,6 @@ export default function Accounts() {
     const month = today.getMonth()
     
     const firstDay = new Date(year, month, 1)
-    const lastDay = new Date(year, month + 1, 0)
     const startDate = new Date(firstDay)
     startDate.setDate(startDate.getDate() - firstDay.getDay()) // Start from Sunday
     

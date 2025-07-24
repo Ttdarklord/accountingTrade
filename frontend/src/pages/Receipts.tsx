@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, Filter, Receipt, Eye, Banknote, DollarSign, Users, X, Archive, CheckCircle, CreditCard, UserCheck, Calendar, FileText } from 'lucide-react'
 import { api } from '../lib/api'
@@ -95,7 +95,7 @@ export default function Receipts() {
   const queryClient = useQueryClient()
 
   // Fetch receipts
-  const { data: receiptsData, isLoading: receiptsLoading } = useQuery({
+  const { data: receiptsData } = useQuery({
     queryKey: ['receipts', viewMode],
     queryFn: () => {
       const params = new URLSearchParams()
@@ -145,14 +145,6 @@ export default function Receipts() {
       const errorMessage = error.response?.data?.error || error.message || 'Unknown error occurred'
       alert(`Failed to create receipt: ${errorMessage}`)
     }
-  })
-
-  const deleteReceiptMutation = useMutation({
-    mutationFn: (receiptId: number) => api.delete(`/receipts/${receiptId}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['receipts'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-    },
   })
 
   const deleteMutation = useMutation({

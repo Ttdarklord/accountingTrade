@@ -44,7 +44,6 @@ const UserManagement: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -97,7 +96,7 @@ const UserManagement: React.FC = () => {
     } catch (err) {
       setError('Failed to load users');
     } finally {
-      setIsLoading(false);
+      // setIsLoading(false); // This line is removed
     }
   };
 
