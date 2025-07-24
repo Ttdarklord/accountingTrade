@@ -1,5 +1,5 @@
 import db from '../database/connection';
-import { Currency, JournalEntry, JournalEntryLine } from '../types';
+import { Currency, JournalEntry, JournalEntryLine, JournalEntryWithLines } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
 
@@ -313,7 +313,7 @@ export class AccountingService {
   /**
    * Get journal entry with lines
    */
-  static getJournalEntry(journalEntryId: number): JournalEntry {
+  static getJournalEntry(journalEntryId: number): JournalEntryWithLines {
     const getEntry = db.prepare(`
       SELECT * FROM journal_entries WHERE id = ?
     `);

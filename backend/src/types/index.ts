@@ -204,6 +204,10 @@ export interface JournalEntry {
   created_at: string;
 }
 
+export interface JournalEntryWithLines extends JournalEntry {
+  lines: JournalEntryLine[];
+}
+
 export interface JournalEntryLine {
   id: number;
   journal_entry_id: number;
