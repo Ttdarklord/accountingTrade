@@ -56,17 +56,26 @@ const corsOptions = {
     // Add production frontend URL if provided
     if (process.env.FRONTEND_URL) {
       allowedOrigins.push(process.env.FRONTEND_URL);
+      console.log('✅ Added frontend URL to CORS:', process.env.FRONTEND_URL);
     }
 
-    // Allow requests with no origin (mobile apps, Postman, etc.) in development
-    if (!origin && process.env.NODE_ENV !== 'production') {
+    console.log('🔍 CORS check - Origin:', origin);
+    console.log('🔍 CORS check - Allowed origins:', allowedOrigins);
+    console.log('🔍 CORS check - Environment:', process.env.NODE_ENV);
+
+    // Allow requests with no origin (mobile apps, Postman, direct API calls, etc.)
+    // This is common and safe for APIs that will be accessed directly
+    if (!origin) {
+      console.log('✅ CORS allowing request with no origin');
       return callback(null, true);
     }
 
-    if (allowedOrigins.includes(origin || '')) {
+    if (allowedOrigins.includes(origin)) {
+      console.log('✅ CORS allowing origin:', origin);
       callback(null, true);
     } else {
       console.log('🚫 CORS blocked origin:', origin);
+      console.log('🚫 CORS allowed origins:', allowedOrigins);
       callback(new Error('Not allowed by CORS'));
     }
   },
