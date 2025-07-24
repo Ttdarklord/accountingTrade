@@ -1,29 +1,45 @@
-import express from 'express';
-import db from '../database/connection';
-import { AccountingService } from '../services/accountingService';
+import express, { Request, Response } from 'express';
+import { db } from '../database/connection';
+import { requireAuth } from '../middleware/auth';
 
 const router = express.Router();
 
-// GET /api/journal/entries - Get journal entries
-router.get('/entries', async (req, res) => {
+interface JournalEntry {
+  id: number;
+  date: string;
+  description: string;
+  reference?: string;
+  lines?: JournalEntryLine[];
+}
+
+interface JournalEntryLine {
+  id: number;
+  journal_entry_id: number;
+  account_code: string;
+  debit_amount: number;
+  credit_amount: number;
+  description?: string;
+}
+
+/**
+ * GET /api/journal - Get journal entries
+ */
+router.get('/', requireAuth, async (req: Request, res: Response) => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
-    const offset = (page - 1) * limit;
+    const offset = parseInt(req.query.offset as string) || 0;
     
     const entries = db.prepare(`
-      SELECT je.*, t.trade_number
-      FROM journal_entries je
-      LEFT JOIN trades t ON je.trade_id = t.id
-      ORDER BY je.created_at DESC
+      SELECT * FROM journal_entries 
+      ORDER BY date DESC, id DESC 
       LIMIT ? OFFSET ?
-    `).all(limit, offset);
+    `).all(limit, offset) as JournalEntry[];
     
     // Get lines for each entry
     for (const entry of entries) {
       const lines = db.prepare(`
         SELECT * FROM journal_entry_lines WHERE journal_entry_id = ?
-      `).all(entry.id);
+      `).all(entry.id) as JournalEntryLine[];
       entry.lines = lines;
     }
     
@@ -34,26 +50,42 @@ router.get('/entries', async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch journal entries',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      error: 'Failed to fetch journal entries'
     });
   }
 });
 
-// GET /api/journal/balances - Get account balances
-router.get('/balances', async (req, res) => {
+/**
+ * GET /api/journal/:id - Get specific journal entry
+ */
+router.get('/:id', requireAuth, async (req: Request, res: Response) => {
   try {
-    const balances = AccountingService.getAccountBalances();
+    const id = parseInt(req.params.id);
+    
+    const entry = db.prepare(`
+      SELECT * FROM journal_entries WHERE id = ?
+    `).get(id) as JournalEntry | undefined;
+    
+    if (!entry) {
+      return res.status(404).json({
+        success: false,
+        error: 'Journal entry not found'
+      });
+    }
+    
+    const lines = db.prepare(`
+      SELECT * FROM journal_entry_lines WHERE journal_entry_id = ?
+    `).all(id) as JournalEntryLine[];
+    entry.lines = lines;
     
     res.json({
       success: true,
-      data: balances
+      data: entry
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch account balances',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      error: 'Failed to fetch journal entry'
     });
   }
 });

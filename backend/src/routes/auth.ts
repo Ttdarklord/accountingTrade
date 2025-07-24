@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { body, validationResult } from 'express-validator';
 import { AuthService, CreateUserRequest } from '../services/authService';
@@ -34,7 +34,7 @@ const createUserLimiter = rateLimit({
 router.post('/login', loginLimiter, [
   body('username').trim().isLength({ min: 1 }).withMessage('Username is required'),
   body('password').isLength({ min: 1 }).withMessage('Password is required')
-], async (req, res) => {
+], async (req: Request, res: Response) => {
   try {
     // Check validation errors
     const errors = validationResult(req);
@@ -98,7 +98,7 @@ router.post('/login', loginLimiter, [
 /**
  * POST /api/auth/logout - User logout
  */
-router.post('/logout', requireAuth, async (req, res) => {
+router.post('/logout', requireAuth, async (req: Request, res: Response) => {
   try {
     const sessionToken = req.sessionToken!;
     const user = req.user!;
@@ -126,7 +126,7 @@ router.post('/logout', requireAuth, async (req, res) => {
 /**
  * GET /api/auth/me - Get current user info
  */
-router.get('/me', requireAuth, (req, res) => {
+router.get('/me', requireAuth, (req: Request, res: Response) => {
   res.json({
     success: true,
     data: req.user
@@ -136,7 +136,7 @@ router.get('/me', requireAuth, (req, res) => {
 /**
  * GET /api/auth/users - Get all users (superadmin only)
  */
-router.get('/users', requireSuperAdmin, (req, res) => {
+router.get('/users', requireSuperAdmin, (req: Request, res: Response) => {
   try {
     const users = AuthService.getAllUsers();
     
@@ -163,7 +163,7 @@ router.post('/users', requireSuperAdmin, createUserLimiter, [
   body('first_name').optional().trim().isLength({ max: 100 }).withMessage('First name too long'),
   body('last_name').optional().trim().isLength({ max: 100 }).withMessage('Last name too long'),
   body('role').optional().isIn(['regular', 'superadmin']).withMessage('Invalid role')
-], async (req, res) => {
+], async (req: Request, res: Response) => {
   try {
     console.log('🔐 Create user request body:', req.body);
     
@@ -225,7 +225,7 @@ router.post('/users', requireSuperAdmin, createUserLimiter, [
  */
 router.put('/users/:id/password', requireSuperAdmin, [
   body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
-], async (req, res) => {
+], async (req: Request, res: Response) => {
   try {
     // Check validation errors
     const errors = validationResult(req);
@@ -287,7 +287,7 @@ router.put('/users/:id/password', requireSuperAdmin, [
 /**
  * PUT /api/auth/users/:id/toggle - Toggle user active status (superadmin only)
  */
-router.put('/users/:id/toggle', requireSuperAdmin, async (req, res) => {
+router.put('/users/:id/toggle', requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const userId = parseInt(req.params.id);
 
@@ -346,7 +346,7 @@ router.put('/users/:id/toggle', requireSuperAdmin, async (req, res) => {
 /**
  * GET /api/auth/activity-logs - Get activity logs (superadmin only)
  */
-router.get('/activity-logs', requireSuperAdmin, (req, res) => {
+router.get('/activity-logs', requireSuperAdmin, (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 100;
     const logs = AuthService.getActivityLogs(Math.min(limit, 500)); // Max 500 logs
@@ -367,7 +367,7 @@ router.get('/activity-logs', requireSuperAdmin, (req, res) => {
 /**
  * POST /api/auth/cleanup-sessions - Clean up expired sessions (superadmin only)
  */
-router.post('/cleanup-sessions', requireSuperAdmin, (req, res) => {
+router.post('/cleanup-sessions', requireSuperAdmin, (req: Request, res: Response) => {
   try {
     AuthService.cleanupExpiredSessions();
     
