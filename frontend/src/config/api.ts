@@ -2,13 +2,16 @@
 
 const getApiBaseUrl = (): string => {
   // In production, if VITE_API_URL is set, use it
-  // Otherwise, use relative URLs (same domain)
   if (import.meta.env.PROD && import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
   
-  // In development or when no explicit API URL is set,
-  // use relative URLs which will work with Vite proxy
+  // Production fallback - use the known backend URL
+  if (import.meta.env.PROD) {
+    return 'https://accountingtrade.onrender.com';
+  }
+  
+  // In development, use relative URLs which will work with Vite proxy
   return '';
 };
 
@@ -56,5 +59,6 @@ export const ENV_INFO = {
   isDevelopment: import.meta.env.DEV,
   isProduction: import.meta.env.PROD,
   apiUrl: import.meta.env.VITE_API_URL,
-  mode: import.meta.env.MODE
+  mode: import.meta.env.MODE,
+  computedApiUrl: API_BASE_URL
 }; 

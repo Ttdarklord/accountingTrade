@@ -1,111 +1,105 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { getApiUrl } from '../lib/api';
 
-export interface User {
+interface User {
   id: number;
   username: string;
-  email?: string;
-  first_name?: string;
-  last_name?: string;
-  role: 'superadmin' | 'regular';
-  is_active: boolean;
-  last_login_at?: string;
-  last_activity_at?: string;
-  created_at: string;
+  firstName: string;
+  lastName: string;
+  role: 'regular' | 'superadmin';
+  isActive: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  isLoading: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-interface AuthProviderProps {
-  children: React.ReactNode;
-}
-
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const refreshUser = async () => {
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
     try {
-      const response = await fetch('/api/auth/me', {
-        credentials: 'include'
+      setIsLoading(true);
+      const response = await fetch(getApiUrl('/api/auth/me'), {
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
       });
-      
+
       if (response.ok) {
-        const data = await response.json();
-        setUser(data.data);
+        const userData = await response.json();
+        setUser(userData);
       } else {
         setUser(null);
       }
     } catch (error) {
-      console.error('Failed to refresh user:', error);
+      console.error('Auth check failed:', error);
       setUser(null);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const login = async (username: string, password: string) => {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify({ username, password }),
-    });
+  const login = async (username: string, password: string): Promise<boolean> => {
+    try {
+      const response = await fetch(getApiUrl('/api/auth/login'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+        credentials: 'include',
+      });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Login failed');
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+        return true;
+      } else {
+        return false;
+      }
+    } catch (error) {
+      console.error('Login failed:', error);
+      return false;
     }
-
-    setUser(data.data.user);
   };
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', {
+      await fetch(getApiUrl('/api/auth/logout'), {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
       });
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('Logout failed:', error);
     } finally {
       setUser(null);
     }
   };
 
-  useEffect(() => {
-    refreshUser().finally(() => setIsLoading(false));
-  }, []);
-
-  const value: AuthContextType = {
-    user,
-    isLoading,
-    isAuthenticated: !!user,
-    login,
-    logout,
-    refreshUser
-  };
-
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
-}; 
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+} 

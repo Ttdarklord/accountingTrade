@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { getApiUrl } from '../lib/api';
 import { 
   Users, 
   Plus, 
@@ -84,7 +85,7 @@ const UserManagement: React.FC = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('/api/auth/users', {
+      const response = await fetch(getApiUrl('/api/auth/users'), {
         credentials: 'include'
       });
       
@@ -103,7 +104,7 @@ const UserManagement: React.FC = () => {
 
   const fetchActivityLogs = async () => {
     try {
-      const response = await fetch('/api/auth/activity-logs?limit=50', {
+      const response = await fetch(getApiUrl('/auth/activity-logs?limit=50'), {
         credentials: 'include'
       });
       
@@ -125,7 +126,7 @@ const UserManagement: React.FC = () => {
     try {
       console.log('Creating user with form data:', createForm);
       
-      const response = await fetch('/api/auth/users', {
+      const response = await fetch(getApiUrl('/auth/users'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -176,7 +177,7 @@ const UserManagement: React.FC = () => {
     if (!selectedUser) return;
 
     try {
-      const response = await fetch(`/api/auth/users/${selectedUser.id}/password`, {
+      const response = await fetch(getApiUrl(`/auth/users/${selectedUser.id}/password`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -202,7 +203,7 @@ const UserManagement: React.FC = () => {
 
   const handleToggleUserStatus = async (user: User) => {
     try {
-      const response = await fetch(`/api/auth/users/${user.id}/toggle`, {
+      const response = await fetch(getApiUrl(`/auth/users/${user.id}/toggle`), {
         method: 'PUT',
         credentials: 'include',
       });
