@@ -11,20 +11,16 @@ if (!fs.existsSync(dataDir)) {
 }
 
 // Create database connection
-function createDatabase() {
-  const database = new Database(dbPath, {
-    verbose: process.env.NODE_ENV === 'development' ? console.log : undefined
-  });
+const database = new Database(dbPath, {
+  verbose: process.env.NODE_ENV === 'development' ? console.log : undefined
+});
 
-  // Enable foreign key constraints
-  database.pragma('foreign_keys = ON');
+// Enable foreign key constraints
+database.pragma('foreign_keys = ON');
 
-  // Enable WAL mode for better concurrent access
-  database.pragma('journal_mode = WAL');
-  
-  return database;
-}
+// Enable WAL mode for better concurrent access
+database.pragma('journal_mode = WAL');
 
-// @ts-ignore - Database export type issue with better-sqlite3
-export const db = createDatabase();
-export default db; 
+// Export as any to avoid type naming issues during build
+export const db = database as any;
+export default database as any; 

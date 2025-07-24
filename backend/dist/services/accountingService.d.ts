@@ -30,6 +30,6 @@ export declare class AccountingService {
     /**
      * Get account balances summary
      */
-    static getAccountBalances(): unknown[];
+    static getAccountBalances(): any;
 }
 //# sourceMappingURL=accountingService.d.ts.map
