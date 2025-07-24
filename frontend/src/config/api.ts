@@ -4,18 +4,18 @@ const getApiBaseUrl = (): string => {
   // In production, if VITE_API_URL is set, use it
   if (import.meta.env.PROD && import.meta.env.VITE_API_URL) {
     console.log('🔧 Using VITE_API_URL:', import.meta.env.VITE_API_URL);
-    return import.meta.env.VITE_API_URL;
+    return `${import.meta.env.VITE_API_URL}/api`;
   }
   
   // Production fallback - use the known backend URL
   if (import.meta.env.PROD) {
-    console.log('🔧 Using production fallback URL: https://accountingtrade.onrender.com');
-    return 'https://accountingtrade.onrender.com';
+    console.log('🔧 Using production fallback URL: https://accountingtrade.onrender.com/api');
+    return 'https://accountingtrade.onrender.com/api';
   }
   
   // In development, use relative URLs which will work with Vite proxy
   console.log('🔧 Using development relative URLs');
-  return '';
+  return '/api';
 };
 
 export const API_BASE_URL = getApiBaseUrl();
@@ -43,27 +43,27 @@ export const createApiUrl = (endpoint: string): string => {
   return `${API_BASE_URL}${cleanEndpoint}`;
 };
 
-// Common API endpoints
+// Common API endpoints (these will now automatically get /api prefix)
 export const API_ENDPOINTS = {
   // Auth
-  LOGIN: '/api/auth/login',
-  LOGOUT: '/api/auth/logout',
-  ME: '/api/auth/me',
-  USERS: '/api/auth/users',
-  ACTIVITY_LOGS: '/api/auth/activity-logs',
+  LOGIN: '/auth/login',
+  LOGOUT: '/auth/logout',
+  ME: '/auth/me',
+  USERS: '/auth/users',
+  ACTIVITY_LOGS: '/auth/activity-logs',
   
   // Core entities
-  TRADES: '/api/trades',
-  PARTIES: '/api/parties',
-  ACCOUNTS: '/api/accounts',
-  RECEIPTS: '/api/receipts',
-  COUNTERPARTS: '/api/counterparts',
-  DASHBOARD: '/api/dashboard',
-  JOURNAL: '/api/journal',
-  SETTLEMENTS: '/api/settlements',
+  TRADES: '/trades',
+  PARTIES: '/parties',
+  ACCOUNTS: '/accounts',
+  RECEIPTS: '/receipts',
+  COUNTERPARTS: '/counterparts',
+  DASHBOARD: '/dashboard',
+  JOURNAL: '/journal',
+  SETTLEMENTS: '/settlements',
   
   // Health check
-  HEALTH: '/api/health'
+  HEALTH: '/health'
 } as const;
 
 // Environment info

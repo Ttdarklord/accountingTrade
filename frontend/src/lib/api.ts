@@ -4,12 +4,12 @@ import axios from 'axios'
 const getBaseURL = () => {
   // Use environment variable if set
   if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
+    return `${import.meta.env.VITE_API_URL}/api`;
   }
   
   // Production fallback
   if (import.meta.env.PROD) {
-    return 'https://accountingtrade.onrender.com';
+    return 'https://accountingtrade.onrender.com/api';
   }
   
   // Development - use relative URLs with proxy
@@ -27,8 +27,9 @@ export const getApiUrl = (endpoint: string): string => {
     return cleanEndpoint;
   }
   
-  // In production, use full URL
-  return `${baseURL}${cleanEndpoint}`;
+  // In production, use full URL with /api prefix
+  const backendUrl = import.meta.env.VITE_API_URL || 'https://accountingtrade.onrender.com';
+  return `${backendUrl}${cleanEndpoint}`;
 };
 
 export const api = axios.create({
