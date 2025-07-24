@@ -3,19 +3,31 @@
 const getApiBaseUrl = (): string => {
   // In production, if VITE_API_URL is set, use it
   if (import.meta.env.PROD && import.meta.env.VITE_API_URL) {
+    console.log('🔧 Using VITE_API_URL:', import.meta.env.VITE_API_URL);
     return import.meta.env.VITE_API_URL;
   }
   
   // Production fallback - use the known backend URL
   if (import.meta.env.PROD) {
+    console.log('🔧 Using production fallback URL: https://accountingtrade.onrender.com');
     return 'https://accountingtrade.onrender.com';
   }
   
   // In development, use relative URLs which will work with Vite proxy
+  console.log('🔧 Using development relative URLs');
   return '';
 };
 
 export const API_BASE_URL = getApiBaseUrl();
+
+// Log the final computed URL for debugging
+console.log('🌐 Final API Base URL:', API_BASE_URL);
+console.log('🌐 Environment:', {
+  PROD: import.meta.env.PROD,
+  DEV: import.meta.env.DEV,
+  MODE: import.meta.env.MODE,
+  VITE_API_URL: import.meta.env.VITE_API_URL
+});
 
 // Helper function to create full API URLs
 export const createApiUrl = (endpoint: string): string => {

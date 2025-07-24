@@ -94,8 +94,8 @@ export function Sidebar() {
               </div>
               <div className="ml-3 flex-1 min-w-0">
                 <div className="text-sm font-medium text-gray-900 truncate">
-                  {user?.first_name && user?.last_name 
-                    ? `${user.first_name} ${user.last_name}`
+                  {user?.firstName && user?.lastName 
+                    ? `${user.firstName} ${user.lastName}`
                     : user?.username}
                 </div>
                 <div className="flex items-center">
