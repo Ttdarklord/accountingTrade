@@ -33,14 +33,6 @@ interface AccountBalance {
   balance: number
 }
 
-interface CounterpartyBalance {
-  counterparty_id: number
-  counterparty_name: string
-  aed_balance: number
-  toman_balance: number
-  total_trades: number
-}
-
 export function Journal() {
   const [searchTerm, setSearchTerm] = useState('')
   const [accountFilter, setAccountFilter] = useState('')
