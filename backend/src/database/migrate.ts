@@ -97,7 +97,7 @@ export default function runMigrations() {
       }
       
       // Drop and recreate with new schema
-      const schemaV2Path = path.join(__dirname, 'schema-v2.sql');
+      const schemaV2Path = path.join(process.cwd(), 'src/database/schema-v2.sql');
       const schemaV2 = fs.readFileSync(schemaV2Path, 'utf-8');
       
       // Start transaction for migration

@@ -1,9 +1,16 @@
 import fs from 'fs';
 import path from 'path';
-import db from '../database/connection';
+import { db } from '../database/connection';
 import { AuthService } from '../services/authService';
 
 const SUPERADMIN_PASSWORD = 'Rasool1-Najibi2-Kheirandish3';
+
+interface UserData {
+  username: string;
+  first_name: string;
+  last_name: string;
+  role: 'regular' | 'superadmin';
+}
 
 async function initializeAuth() {
   console.log('🔧 Initializing authentication system...');
@@ -11,7 +18,8 @@ async function initializeAuth() {
   try {
     // 1. Run the user management migration
     console.log('📋 Running user management migration...');
-    const migrationPath = path.join(__dirname, '../database/migrations/005_create_users.sql');
+    // Always read from source directory, regardless of where this script is running from
+    const migrationPath = path.join(process.cwd(), 'src/database/migrations/005_create_users.sql');
     const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
     
     // Split by semicolon and execute each statement
