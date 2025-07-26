@@ -40,8 +40,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
+        const responseData = await response.json();
+        // Extract the user object from the response data structure
+        setUser(responseData.data);
       } else {
         setUser(null);
       }
@@ -65,8 +66,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
+        const responseData = await response.json();
+        // Extract the user object from the response data structure
+        setUser(responseData.data.user);
         return true;
       } else {
         return false;
