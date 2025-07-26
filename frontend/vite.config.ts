@@ -27,6 +27,8 @@ export default defineConfig(({ mode }) => ({
       }
     }
   },
+  // Copy public files including _redirects to dist
+  publicDir: 'public',
   define: {
     'import.meta.env.VITE_API_URL': JSON.stringify(
       mode === 'production' 
