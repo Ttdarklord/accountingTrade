@@ -8,8 +8,8 @@ const router = express.Router();
 
 // Rate limiting for login attempts
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts per window per IP
+  windowMs: 5 * 60 * 1000, // 5 minutes (reduced from 15)
+  max: 15, // 15 attempts per window per IP (increased from 5)
   message: {
     success: false,
     error: 'Too many login attempts. Please try again later.'
@@ -63,7 +63,7 @@ router.post('/login', loginLimiter, [
     res.cookie('sessionToken', loginResult.sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: '/'
     });
@@ -72,7 +72,7 @@ router.post('/login', loginLimiter, [
     console.log('🍪 Cookie settings:', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/'
     });
