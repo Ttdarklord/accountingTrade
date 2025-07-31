@@ -1073,16 +1073,22 @@ router.put('/:id/edit', async (req, res) => {
             const newCreditAmount = payerStatementLine.credit_amount + amountDifference;
             const newBalanceAfter = payerStatementLine.balance_after + amountDifference;
             
-                         db.prepare(`
-               UPDATE counterpart_statement_lines 
-               SET credit_amount = ?, balance_after = ?, description = ?
-               WHERE id = ?
-             `).run(
-               newCreditAmount,
-               newBalanceAfter, 
-               payerStatementLine.description + ' (Updated)',
-               payerStatementLine.id
-             );
+            // Check if description already has (Updated)
+            const existingDescription = payerStatementLine.description;
+            const updatedDescription = existingDescription.includes('(Updated)') 
+              ? existingDescription 
+              : existingDescription + ' (Updated)';
+            
+            db.prepare(`
+              UPDATE counterpart_statement_lines 
+              SET credit_amount = ?, balance_after = ?, description = ?
+              WHERE id = ?
+            `).run(
+              newCreditAmount,
+              newBalanceAfter, 
+              updatedDescription,
+              payerStatementLine.id
+            );
             
             // Update counterpart balance
             db.prepare(`
@@ -1119,21 +1125,27 @@ router.put('/:id/edit', async (req, res) => {
             
             if (receiverStatementLine) {
               // Update the debit amount and recalculate balance
-              const newDebitAmount = receiverStatementLine.debit_amount - amountDifference;
+              const newDebitAmount = receiverStatementLine.debit_amount + amountDifference;
               const newBalanceAfter = receiverStatementLine.balance_after - amountDifference;
               
-                             db.prepare(`
-                 UPDATE counterpart_statement_lines 
-                 SET debit_amount = ?, balance_after = ?, description = ?
-                 WHERE id = ?
-               `).run(
-                 newDebitAmount,
-                 newBalanceAfter,
-                 receiverStatementLine.description + ' (Updated)',
-                 receiverStatementLine.id
-               );
+              // Check if description already has (Updated)
+              const existingDescription = receiverStatementLine.description;
+              const updatedDescription = existingDescription.includes('(Updated)') 
+                ? existingDescription 
+                : existingDescription + ' (Updated)';
               
-              // Update counterpart balance
+              db.prepare(`
+                UPDATE counterpart_statement_lines 
+                SET debit_amount = ?, balance_after = ?, description = ?
+                WHERE id = ?
+              `).run(
+                newDebitAmount,
+                newBalanceAfter,
+                updatedDescription,
+                receiverStatementLine.id
+              );
+              
+              // Update counterpart balance (receiver balance decreases when they receive more)
               db.prepare(`
                 UPDATE counterpart_balances 
                 SET balance = balance - ? 
@@ -1189,6 +1201,12 @@ router.put('/:id/edit', async (req, res) => {
             const balanceChange = amountDifference * (isReceive ? -1 : 1);
             const newBalanceAfter = aedStatementLine.balance_after + balanceChange;
             
+            // Check if description already has (Updated)
+            const existingDescription = aedStatementLine.description;
+            const updatedDescription = existingDescription.includes('(Updated)') 
+              ? existingDescription 
+              : existingDescription + ' (Updated)';
+            
             if (isReceive) {
               // For receive: update debit amount (they owe us less)
               db.prepare(`
@@ -1198,7 +1216,7 @@ router.put('/:id/edit', async (req, res) => {
               `).run(
                 newAmount,
                 newBalanceAfter,
-                aedStatementLine.description + ' (Updated)',
+                updatedDescription,
                 aedStatementLine.id
               );
             } else {
@@ -1210,7 +1228,7 @@ router.put('/:id/edit', async (req, res) => {
               `).run(
                 newAmount,
                 newBalanceAfter,
-                aedStatementLine.description + ' (Updated)',
+                updatedDescription,
                 aedStatementLine.id
               );
             }
