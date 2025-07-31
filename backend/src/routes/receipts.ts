@@ -171,6 +171,28 @@ router.post('/', async (req, res) => {
   try {
     const validatedData = createReceiptSchema.parse(req.body);
     
+    // Check for potential duplicates
+    const duplicateCheck = db.prepare(`
+      SELECT id FROM payment_receipts 
+      WHERE tracking_last_5 = ? 
+      AND amount = ? 
+      AND currency = ? 
+      AND receipt_date = ?
+      AND (is_deleted IS NULL OR is_deleted = 0)
+    `).get(
+      validatedData.tracking_last_5,
+      validatedData.amount,
+      validatedData.currency,
+      validatedData.receipt_date
+    );
+    
+    if (duplicateCheck) {
+      return res.status(400).json({
+        success: false,
+        error: 'Potential duplicate receipt detected. A receipt with the same tracking number, amount, currency, and date already exists.'
+      });
+    }
+    
     let payer: any = null;
     let receiverAccount: any = null;
     let tradingParty: any = null;
@@ -960,6 +982,30 @@ router.put('/:id/edit', async (req, res) => {
       });
     }
     
+    // Check for potential duplicates (excluding current receipt)
+    const duplicateCheck = db.prepare(`
+      SELECT id FROM payment_receipts 
+      WHERE tracking_last_5 = ? 
+      AND amount = ? 
+      AND currency = ? 
+      AND receipt_date = ?
+      AND id != ?
+      AND (is_deleted IS NULL OR is_deleted = 0)
+    `).get(
+      validatedData.tracking_last_5,
+      validatedData.amount,
+      validatedData.currency,
+      validatedData.receipt_date,
+      receiptId
+    );
+    
+    if (duplicateCheck) {
+      return res.status(400).json({
+        success: false,
+        error: 'Potential duplicate receipt detected. Another receipt with the same tracking number, amount, currency, and date already exists.'
+      });
+    }
+    
     // Validate counterparts based on receipt type
     let payer: any = null;
     let receiverAccount: any = null;
@@ -1027,16 +1073,16 @@ router.put('/:id/edit', async (req, res) => {
             const newCreditAmount = payerStatementLine.credit_amount + amountDifference;
             const newBalanceAfter = payerStatementLine.balance_after + amountDifference;
             
-            db.prepare(`
-              UPDATE counterpart_statement_lines 
-              SET credit_amount = ?, balance_after = ?, description = ?
-              WHERE id = ?
-            `).run(
-              newCreditAmount,
-              newBalanceAfter, 
-              `Receipt: ${payer.name} paid ${validatedData.amount.toLocaleString()} Toman (Updated)`,
-              payerStatementLine.id
-            );
+                         db.prepare(`
+               UPDATE counterpart_statement_lines 
+               SET credit_amount = ?, balance_after = ?, description = ?
+               WHERE id = ?
+             `).run(
+               newCreditAmount,
+               newBalanceAfter, 
+               payerStatementLine.description + ' (Updated)',
+               payerStatementLine.id
+             );
             
             // Update counterpart balance
             db.prepare(`
@@ -1076,16 +1122,16 @@ router.put('/:id/edit', async (req, res) => {
               const newDebitAmount = receiverStatementLine.debit_amount - amountDifference;
               const newBalanceAfter = receiverStatementLine.balance_after - amountDifference;
               
-              db.prepare(`
-                UPDATE counterpart_statement_lines 
-                SET debit_amount = ?, balance_after = ?, description = ?
-                WHERE id = ?
-              `).run(
-                newDebitAmount,
-                newBalanceAfter,
-                `Receipt: Payment to ${receiverAccount.counterpart_name} (Updated)`,
-                receiverStatementLine.id
-              );
+                             db.prepare(`
+                 UPDATE counterpart_statement_lines 
+                 SET debit_amount = ?, balance_after = ?, description = ?
+                 WHERE id = ?
+               `).run(
+                 newDebitAmount,
+                 newBalanceAfter,
+                 receiverStatementLine.description + ' (Updated)',
+                 receiverStatementLine.id
+               );
               
               // Update counterpart balance
               db.prepare(`
@@ -1114,14 +1160,123 @@ router.put('/:id/edit', async (req, res) => {
             }
           }
         } else {
-          // AED receipt - update company balance
+          // AED receipt - update company balance and journal entries
           const multiplier = validatedData.receipt_type === 'receive' ? 1 : -1;
-          const stmt = db.prepare(`
+          
+          // Update company safe balance
+          db.prepare(`
             UPDATE company_balances 
             SET safe_balance = safe_balance + ? 
             WHERE currency = 'AED'
-          `);
-          stmt.run(amountDifference * multiplier);
+          `).run(amountDifference * multiplier);
+          
+          // Update counterpart balance for AED receipts
+          db.prepare(`
+            UPDATE counterpart_balances 
+            SET balance = balance + ? 
+            WHERE counterpart_id = ? AND currency = 'AED'
+          `).run(amountDifference * (validatedData.receipt_type === 'receive' ? -1 : 1), validatedData.trading_party_id);
+          
+          // Update AED counterpart statement line if exists
+          const aedStatementLine = db.prepare(`
+            SELECT * FROM counterpart_statement_lines 
+            WHERE receipt_id = ? AND counterpart_id = ?
+          `).get(receiptId, validatedData.trading_party_id) as any;
+          
+          if (aedStatementLine) {
+            const isReceive = validatedData.receipt_type === 'receive';
+            const newAmount = validatedData.amount;
+            const balanceChange = amountDifference * (isReceive ? -1 : 1);
+            const newBalanceAfter = aedStatementLine.balance_after + balanceChange;
+            
+            if (isReceive) {
+              // For receive: update debit amount (they owe us less)
+              db.prepare(`
+                UPDATE counterpart_statement_lines 
+                SET debit_amount = ?, balance_after = ?, description = ?
+                WHERE id = ?
+              `).run(
+                newAmount,
+                newBalanceAfter,
+                aedStatementLine.description + ' (Updated)',
+                aedStatementLine.id
+              );
+            } else {
+              // For pay: update credit amount (we owe them less)
+              db.prepare(`
+                UPDATE counterpart_statement_lines 
+                SET credit_amount = ?, balance_after = ?, description = ?
+                WHERE id = ?
+              `).run(
+                newAmount,
+                newBalanceAfter,
+                aedStatementLine.description + ' (Updated)',
+                aedStatementLine.id
+              );
+            }
+            
+            // Recalculate subsequent AED statement line balances
+            const subsequentLines = db.prepare(`
+              SELECT * FROM counterpart_statement_lines 
+              WHERE counterpart_id = ? AND currency = 'AED' 
+              AND transaction_date > ? 
+              ORDER BY transaction_date, created_at
+            `).all(validatedData.trading_party_id, aedStatementLine.transaction_date) as any[];
+            
+            let runningBalance = newBalanceAfter;
+            for (const line of subsequentLines) {
+              runningBalance = runningBalance + (line.credit_amount || 0) - (line.debit_amount || 0);
+              db.prepare(`
+                UPDATE counterpart_statement_lines 
+                SET balance_after = ? 
+                WHERE id = ?
+              `).run(runningBalance, line.id);
+            }
+          }
+        }
+        
+        // Update journal entry amounts for both TOMAN and AED
+        const journalLines = db.prepare(`
+          SELECT * FROM journal_entry_lines 
+          WHERE journal_entry_id = (
+            SELECT id FROM journal_entries WHERE receipt_id = ?
+          )
+        `).all(receiptId) as any[];
+        
+        for (const line of journalLines) {
+          if (existingReceipt.currency === 'TOMAN') {
+            // For TOMAN: Update both debit and credit amounts
+            const newAmount = line.debit_amount > 0 ? validatedData.amount : validatedData.amount;
+            if (line.debit_amount > 0) {
+              db.prepare(`
+                UPDATE journal_entry_lines 
+                SET debit_amount = ? 
+                WHERE id = ?
+              `).run(newAmount, line.id);
+            } else {
+              db.prepare(`
+                UPDATE journal_entry_lines 
+                SET credit_amount = ? 
+                WHERE id = ?
+              `).run(newAmount, line.id);
+            }
+          } else {
+            // For AED: Update cash and receivables amounts
+            const newAmount = validatedData.amount;
+            if (line.debit_amount > 0) {
+              db.prepare(`
+                UPDATE journal_entry_lines 
+                SET debit_amount = ? 
+                WHERE id = ?
+              `).run(newAmount, line.id);
+            } else {
+              db.prepare(`
+                UPDATE journal_entry_lines 
+                SET credit_amount = ? 
+                WHERE id = ?
+              `).run(newAmount, line.id);
+            }
+          }
         }
       }
       
@@ -1156,18 +1311,44 @@ router.put('/:id/edit', async (req, res) => {
         receiptId
       );
       
-      // Update journal entry
+      // Update journal entry description
+      const existingJournal = db.prepare(`
+        SELECT description FROM journal_entries WHERE receipt_id = ?
+      `).get(receiptId) as any;
+      
       const journalUpdateStmt = db.prepare(`
         UPDATE journal_entries 
         SET description = ?, entry_date = ?
         WHERE receipt_id = ?
       `);
       
-      const newDescription = validatedData.currency === 'TOMAN' 
-        ? `Receipt: ${payer.name} paid ${validatedData.amount.toLocaleString()} Toman to ${receiverAccount.counterpart_name}`
-        : `Receipt: ${validatedData.receipt_type} ${validatedData.amount.toLocaleString()} AED ${validatedData.receipt_type === 'pay' ? 'to' : 'from'} ${validatedData.individual_name} (${tradingParty.name})`;
+      // Keep original description and add (Updated) if not already there
+      const updatedDescription = existingJournal.description.includes('(Updated)') 
+        ? existingJournal.description 
+        : existingJournal.description + ' (Updated)';
       
-      journalUpdateStmt.run(newDescription, validatedData.receipt_date, receiptId);
+      journalUpdateStmt.run(updatedDescription, validatedData.receipt_date, receiptId);
+      
+      // Recalculate company balances to ensure dashboard accuracy
+      if (validatedData.currency === 'AED') {
+        const currentAedBalance = db.prepare(`
+          SELECT safe_balance FROM company_balances WHERE currency = 'AED'
+        `).get() as any;
+        
+        // Update company balance updated_at timestamp to trigger dashboard refresh
+        db.prepare(`
+          UPDATE company_balances 
+          SET updated_at = CURRENT_TIMESTAMP 
+          WHERE currency = 'AED'
+        `).run();
+      } else {
+        // Update TOMAN balance timestamp too for consistency
+        db.prepare(`
+          UPDATE company_balances 
+          SET updated_at = CURRENT_TIMESTAMP 
+          WHERE currency = 'TOMAN'
+        `).run();
+      }
       
       db.exec('COMMIT');
       

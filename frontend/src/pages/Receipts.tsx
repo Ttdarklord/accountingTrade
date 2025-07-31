@@ -203,6 +203,8 @@ export default function Receipts() {
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['trades'] })
       queryClient.invalidateQueries({ queryKey: ['counterparts'] })
+      queryClient.invalidateQueries({ queryKey: ['journal'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
       setShowEditModal(false)
       setReceiptToEdit(null)
       resetForm()
