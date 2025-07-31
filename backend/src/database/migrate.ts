@@ -33,6 +33,16 @@ const migrations: Migration[] = [
     id: 'credit_application_support',
     description: 'Add credit application support to trade_settlements table',
     timestamp: Date.now() + 10800000 // After settlement tracking migration
+  },
+  {
+    id: 'receipt_updated_at_field',
+    description: 'Add updated_at field to payment_receipts table',
+    timestamp: Date.now() + 14400000 // After credit application migration
+  },
+  {
+    id: 'notifications_system',
+    description: 'Create notifications table for system events',
+    timestamp: Date.now() + 18000000 // After updated_at field migration
   }
 ];
 
@@ -369,6 +379,65 @@ export default function runMigrations() {
         db.exec('COMMIT');
         markMigrationCompleted(creditMigration);
         console.log('✅ Credit application support migration completed');
+        
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    }
+    
+    // Run updated_at field migration
+    const updatedAtMigration = migrations[5];
+    if (!hasMigrationRun(updatedAtMigration)) {
+      console.log('Running updated_at field migration...');
+      
+      try {
+        db.exec('BEGIN TRANSACTION');
+        
+        // Add updated_at field to payment_receipts table
+        db.exec('ALTER TABLE payment_receipts ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP');
+        
+        db.exec('COMMIT');
+        markMigrationCompleted(updatedAtMigration);
+        console.log('✅ Updated_at field migration completed');
+        
+      } catch (error) {
+        db.exec('ROLLBACK');
+        console.log('Updated_at field already exists or migration failed:', error);
+        // Mark as completed anyway to avoid re-running
+        markMigrationCompleted(updatedAtMigration);
+      }
+    }
+    
+    // Run notifications system migration
+    const notificationsMigration = migrations[6];
+    if (!hasMigrationRun(notificationsMigration)) {
+      console.log('Running notifications system migration...');
+      
+      try {
+        db.exec('BEGIN TRANSACTION');
+        
+        // Create notifications table
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS notifications (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              type TEXT NOT NULL CHECK(type IN ('trade', 'receipt', 'edit', 'delete', 'restore')),
+              title TEXT NOT NULL,
+              message TEXT NOT NULL,
+              entity_type TEXT NOT NULL CHECK(entity_type IN ('trade', 'receipt', 'account', 'party')),
+              entity_id INTEGER NOT NULL,
+              is_read BOOLEAN DEFAULT 0,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        
+        // Create indexes for better performance
+        db.exec('CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(is_read, created_at DESC)');
+        
+        db.exec('COMMIT');
+        markMigrationCompleted(notificationsMigration);
+        console.log('✅ Notifications system migration completed');
         
       } catch (error) {
         db.exec('ROLLBACK');

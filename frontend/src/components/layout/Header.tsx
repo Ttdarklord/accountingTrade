@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Bell, Menu, X, Check, CheckCheck } from 'lucide-react'
+import { Bell, Menu, X, CheckCheck } from 'lucide-react'
 import { api } from '../../lib/api'
 
 interface Notification {
