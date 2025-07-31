@@ -282,7 +282,7 @@ export interface CreateTradeRequest {
 
 export interface CreateReceiptRequest {
   // Common fields
-  tracking_last_5: string;
+  tracking_last_5: string; // For TOMAN: user input (1-20 chars), For AED: auto-generated (5 chars)
   amount: number;
   currency: Currency;
   receipt_date: string;

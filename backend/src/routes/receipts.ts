@@ -10,7 +10,7 @@ const router = express.Router();
 // Validation schema for both TOMAN and AED receipts
 const createReceiptSchema = z.object({
   // Common fields
-  tracking_last_5: z.string().length(5),
+  tracking_last_5: z.string().min(1).max(20), // Allow 1-20 characters for user input
   amount: z.number().positive(),
   currency: z.enum(['AED', 'TOMAN']),
   receipt_date: z.string(),
@@ -26,12 +26,12 @@ const createReceiptSchema = z.object({
   individual_name: z.string().min(1).optional()
 }).refine(data => {
   if (data.currency === 'TOMAN') {
-    return data.payer_id && data.receiver_account_id;
+    return data.payer_id && data.receiver_account_id && data.tracking_last_5.trim().length > 0;
   } else {
     return data.receipt_type && data.trading_party_id && data.individual_name;
   }
 }, {
-  message: "For TOMAN receipts, payer_id and receiver_account_id are required. For AED receipts, receipt_type, trading_party_id, and individual_name are required."
+  message: "For TOMAN receipts, payer_id, receiver_account_id, and tracking_last_5 are required. For AED receipts, receipt_type, trading_party_id, and individual_name are required."
 });
 
 // Validation schema for receipt deletion
