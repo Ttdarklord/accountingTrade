@@ -44,8 +44,10 @@ SESSION_TIMEOUT=7200000
 BCRYPT_ROUNDS=12
 LOGIN_RATE_LIMIT=5
 CREATE_USER_RATE_LIMIT=3
-DATABASE_PATH=./data/database.db
+DATABASE_PATH=/opt/render/project/data/agrivex.db
 ```
+
+⚠️ **Important Database Note**: The current setup uses SQLite with local file storage. On Render's free tier, the file system is ephemeral, meaning data will be lost when the service restarts or goes to sleep. For production use, consider upgrading to a paid plan with persistent volumes or use an external database service.
 
 **🔐 Generate Secure Secrets:**
 ```bash
@@ -101,7 +103,7 @@ FRONTEND_URL=https://your-frontend-name.onrender.com
 1. Visit your frontend URL
 2. Try logging in with:
    - Username: `yasinnajibi`
-   - Password: `Rasool1-Najibi2-Kheirandish3`
+   - Password: `Rasool1-Najibi2-Kheirandish3` 
 3. Test creating a new user (superadmin functionality)
 4. Verify all features work correctly
 
@@ -143,9 +145,13 @@ Both services will automatically redeploy when you push to your main branch.
 3. Test login endpoint directly
 
 #### Database Issues
-1. Database is SQLite and persists automatically
+1. **Data Loss on Free Tier**: If data disappears between sessions, this is because Render's free tier uses ephemeral storage
+   - **Solution 1**: Upgrade to Render's paid plan ($7/month) for persistent disk storage
+   - **Solution 2**: Use an external database service like PostgreSQL or MySQL
+   - **Temporary workaround**: Accept data loss as limitation of free tier
 2. Initial admin user is created on first start
 3. Check backend logs for migration errors
+4. Verify DATABASE_PATH environment variable is set correctly
 
 ## 📱 Production Features
 
@@ -166,7 +172,19 @@ Your deployed app includes:
 2. Services auto-deploy (watch the logs)
 3. Test functionality after deployment
 
-### Database Backup
+### Database Persistence & Backup
+
+**🚨 Critical Information for Free Tier Users:**
+- **Free Tier Limitation**: Render's free tier uses ephemeral storage - data will be lost when the service sleeps (after 15 minutes of inactivity) or restarts
+- **Paid Tier**: Upgrade to paid plan ($7/month) for persistent disk storage where data survives restarts
+- **External Database**: For true production use, consider using external PostgreSQL or MySQL services
+
+**For Free Tier:**
+- Accept data loss as a limitation
+- Use primarily for testing and development
+- Data will reset each time the service goes to sleep
+
+**For Paid Tier:**
 - SQLite database persists on Render's disk
 - Consider periodic exports for critical data
 - Database survives service restarts

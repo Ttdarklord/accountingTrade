@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, Filter, Receipt, Eye, Banknote, DollarSign, Users, X, Archive, CheckCircle, CreditCard, UserCheck, Calendar, FileText } from 'lucide-react'
 import { api } from '../lib/api'
+import { format } from 'date-fns'
 
 interface PaymentReceipt {
   id: number
@@ -65,15 +66,20 @@ export default function Receipts() {
   const [currencyFilter, setCurrencyFilter] = useState<'ALL' | 'TOMAN' | 'AED'>('ALL')
   const [accountSearchTerm, setAccountSearchTerm] = useState('')
   const [showAccountDropdown, setShowAccountDropdown] = useState(false)
+  // Form state for creating new receipts
   const [formData, setFormData] = useState({
+    // Common fields
+    amount: '',
+    receipt_date: format(new Date(), 'yyyy-MM-dd'),
+    notes: '',
+    tracking_last_5: '', // Add tracking field for user input
+    
+    // TOMAN receipt fields
     payer_id: 0,
     receiver_account_id: 0,
-    tracking_last_5: '',
-    amount: '',
-    receipt_date: new Date().toISOString().split('T')[0],
-    notes: '',
-    // AED specific fields
-    receipt_type: 'pay' as 'pay' | 'receive',
+    
+    // AED receipt fields
+    receipt_type: 'receive' as 'pay' | 'receive',
     trading_party_id: 0,
     individual_name: ''
   })
@@ -185,13 +191,13 @@ export default function Receipts() {
 
   const resetForm = () => {
     setFormData({
+      amount: '',
+      receipt_date: format(new Date(), 'yyyy-MM-dd'),
+      notes: '',
+      tracking_last_5: '',
       payer_id: 0,
       receiver_account_id: 0,
-      tracking_last_5: '',
-      amount: '',
-      receipt_date: new Date().toISOString().split('T')[0],
-      notes: '',
-      receipt_type: 'pay',
+      receipt_type: 'receive',
       trading_party_id: 0,
       individual_name: ''
     })
@@ -212,6 +218,11 @@ export default function Receipts() {
         alert('Please select a receiver account')
         return
       }
+
+      if (!formData.tracking_last_5.trim()) {
+        alert('Please enter a tracking number')
+        return
+      }
     } else {
       // AED receipt validation
       if (formData.trading_party_id === 0) {
@@ -225,12 +236,8 @@ export default function Receipts() {
       }
     }
 
-    // Auto-generate 5-digit tracking number
-    const autoTracking = Math.floor(10000 + Math.random() * 90000).toString()
-
     // Prepare payload based on receipt type
     let payload: any = {
-      tracking_last_5: autoTracking,
       amount: Number(formData.amount.replace(/,/g, '')),
       currency: receiptType,
       receipt_date: formData.receipt_date,
@@ -238,9 +245,14 @@ export default function Receipts() {
     }
 
     if (receiptType === 'TOMAN') {
+      // For TOMAN receipts, use user-provided tracking number
       payload.payer_id = formData.payer_id
       payload.receiver_account_id = formData.receiver_account_id
+      payload.tracking_last_5 = formData.tracking_last_5
     } else {
+      // For AED receipts, auto-generate 5-digit tracking number
+      const autoTracking = Math.floor(10000 + Math.random() * 90000).toString()
+      payload.tracking_last_5 = autoTracking
       payload.receipt_type = formData.receipt_type
       payload.trading_party_id = formData.trading_party_id
       payload.individual_name = formData.individual_name
@@ -890,6 +902,24 @@ export default function Receipts() {
                       </div>
                     </div>
                   )}
+
+                  {/* Tracking Number for TOMAN */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <Receipt className="h-4 w-4 inline mr-1" />
+                      Tracking Number *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Enter tracking number (e.g., 12345)"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={formData.tracking_last_5}
+                      onChange={(e) => setFormData({ ...formData, tracking_last_5: e.target.value })}
+                      required
+                      maxLength={20}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Enter the tracking number for this transfer</p>
+                  </div>
                 </>
               ) : (
                 <>

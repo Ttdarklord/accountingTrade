@@ -2,12 +2,18 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-const dbPath = path.join(process.cwd(), 'data', 'agrivex.db');
+// Use DATABASE_PATH environment variable if provided, otherwise default to current behavior
+const dbPath = process.env.DATABASE_PATH 
+  ? path.resolve(process.env.DATABASE_PATH)
+  : path.join(process.cwd(), 'data', 'agrivex.db');
+
+console.log(`📁 Database path: ${dbPath}`);
 
 // Ensure data directory exists
 const dataDir = path.dirname(dbPath);
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
+  console.log(`📁 Created data directory: ${dataDir}`);
 }
 
 // Create database connection
