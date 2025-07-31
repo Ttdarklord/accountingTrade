@@ -1,6 +1,7 @@
 import express from 'express';
 import { TradeService } from '../services/tradeService';
 import { CreateTradeRequest, SellFromPositionRequest } from '../types';
+import { createNotification } from './notifications';
 import { z } from 'zod';
 
 const router = express.Router();
@@ -108,6 +109,15 @@ router.post('/', async (req, res) => {
     }
     
     const trade = TradeService.createTrade(validatedData as CreateTradeRequest);
+    
+    // Create notification
+    createNotification(
+      'trade',
+      'New Trade Created',
+      `${validatedData.trade_type} trade for ${validatedData.amount.toLocaleString()} ${validatedData.base_currency} created`,
+      'trade',
+      trade.id
+    );
     
     res.status(201).json({
       success: true,

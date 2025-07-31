@@ -3,6 +3,7 @@ import db from '../database/connection';
 import { PaymentReceipt, CreateReceiptRequest, DeleteReceiptRequest, RestoreReceiptRequest } from '../types';
 import { updateCounterpartBalance } from './counterparts';
 import { SettlementService } from '../services/settlementService';
+import { createNotification } from './notifications';
 import { z } from 'zod';
 
 const router = express.Router();
@@ -419,6 +420,15 @@ router.post('/', async (req, res) => {
         WHERE pr.id = ?
       `).get(receiptId) as PaymentReceipt;
       
+      // Create notification
+      createNotification(
+        'receipt',
+        'New Receipt Created',
+        `${validatedData.currency} receipt for ${validatedData.amount.toLocaleString()} created`,
+        'receipt',
+        receiptId
+      );
+
       res.status(201).json({
         success: true,
         data: newReceipt,
@@ -649,6 +659,15 @@ router.put('/:id/delete', async (req, res) => {
         // Don't fail the entire operation - receipt deletion is still valid
       }
       
+      // Create notification
+      createNotification(
+        'delete',
+        'Receipt Deleted',
+        `${receipt.currency} receipt for ${receipt.amount.toLocaleString()} was deleted: ${validatedData.reason}`,
+        'receipt',
+        receiptId
+      );
+
       res.json({
         success: true,
         message: 'Receipt deleted, accounting entries reversed, and settlement reversed successfully'
@@ -876,6 +895,15 @@ router.put('/:id/restore', async (req, res) => {
         // Don't fail the entire operation - receipt restoration is still valid
       }
       
+      // Create notification
+      createNotification(
+        'restore',
+        'Receipt Restored',
+        `${receipt.currency} receipt for ${receipt.amount.toLocaleString()} was restored: ${validatedData.reason}`,
+        'receipt',
+        receiptId
+      );
+
       res.json({
         success: true,
         message: 'Receipt restored, accounting entries re-applied, and settlement re-processed successfully'
@@ -1097,6 +1125,15 @@ router.put('/:id/edit', async (req, res) => {
         WHERE pr.id = ?
       `).get(receiptId) as any;
       
+      // Create notification
+      createNotification(
+        'edit',
+        'Receipt Updated',
+        `${validatedData.currency} receipt for ${validatedData.amount.toLocaleString()} was updated`,
+        'receipt',
+        receiptId
+      );
+
       res.json({
         success: true,
         data: updatedReceipt,

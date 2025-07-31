@@ -283,12 +283,36 @@ export default function Receipts() {
       payload.individual_name = formData.individual_name
     }
 
-    createReceiptMutation.mutate(payload)
+    if (showEditModal && receiptToEdit) {
+      editReceiptMutation.mutate({ receiptId: receiptToEdit.id, data: payload })
+    } else {
+      createReceiptMutation.mutate(payload)
+    }
   }
 
   const handleDelete = (receipt: PaymentReceipt) => {
     setReceiptToDelete(receipt)
     setShowDeleteConfirm(true)
+  }
+
+  const handleEdit = (receipt: PaymentReceipt) => {
+    setReceiptToEdit(receipt)
+    setReceiptType(receipt.currency as 'TOMAN' | 'AED')
+    
+    // Populate form with existing data
+    setFormData({
+      amount: receipt.amount.toLocaleString(),
+      receipt_date: receipt.receipt_date,
+      notes: receipt.notes || '',
+      tracking_last_5: receipt.tracking_last_5,
+      payer_id: receipt.payer_id || 0,
+      receiver_account_id: receipt.receiver_account_id || 0,
+      receipt_type: receipt.receipt_type as 'pay' | 'receive' || 'receive',
+      trading_party_id: receipt.trading_party_id || 0,
+      individual_name: receipt.individual_name || ''
+    })
+    
+    setShowEditModal(true)
   }
 
   const handleDeleteConfirm = () => {
@@ -1090,6 +1114,326 @@ export default function Receipts() {
                   disabled={createReceiptMutation.isPending}
                 >
                   {createReceiptMutation.isPending ? 'Creating...' : `Create ${receiptType} Receipt`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Receipt Modal */}
+      {showEditModal && receiptToEdit && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900">Edit Receipt</h3>
+                  <p className="text-gray-600 mt-1">Update receipt information and balances will be adjusted</p>
+                </div>
+                <button
+                  onClick={() => {
+                    resetForm()
+                    setShowEditModal(false)
+                    setReceiptToEdit(null)
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+            
+            {/* Info Banner */}
+            <div className="p-6 bg-yellow-50 border-b border-gray-200">
+              <div className="flex items-center space-x-3">
+                <EditIcon className="h-5 w-5 text-yellow-600" />
+                <div>
+                  <p className="text-sm font-medium text-yellow-900">Editing Receipt</p>
+                  <p className="text-sm text-yellow-700">
+                    Changes will update accounting records and counterpart balances automatically.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              {/* Currency Toggle - Read Only for Edit */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+                  <DollarSign className="h-5 w-5 mr-2" />
+                  Receipt Type (Cannot be changed)
+                </h4>
+                <div className="flex items-center space-x-4">
+                  <div className={`flex items-center space-x-2 px-4 py-2 rounded-lg border-2 ${
+                    receiptType === 'TOMAN'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-yellow-500 bg-yellow-50 text-yellow-700'
+                  }`}>
+                    <div className={`w-3 h-3 rounded-full ${receiptType === 'TOMAN' ? 'bg-blue-500' : 'bg-yellow-500'}`} />
+                    <span className="font-medium">{receiptType} Receipt</span>
+                  </div>
+                </div>
+              </div>
+
+              {receiptType === 'TOMAN' ? (
+                <>
+                  {/* TOMAN Receipt Fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <Users className="h-4 w-4 inline mr-1" />
+                        Who Paid? *
+                      </label>
+                      <select
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        value={formData.payer_id}
+                        onChange={(e) => setFormData({ ...formData, payer_id: parseInt(e.target.value) })}
+                        required
+                      >
+                        <option value={0}>Select the payer</option>
+                        {(partiesData || []).map((party: TradingParty) => (
+                          <option key={party.id} value={party.id}>
+                            {party.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="relative">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <CreditCard className="h-4 w-4 inline mr-1" />
+                        Receiver Account *
+                      </label>
+                      
+                      {/* Search Input */}
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Search by trading party or account number..."
+                          className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-10 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          value={accountSearchTerm}
+                          onChange={(e) => {
+                            setAccountSearchTerm(e.target.value)
+                            setShowAccountDropdown(true)
+                          }}
+                          onFocus={() => setShowAccountDropdown(true)}
+                        />
+                        <Search className="h-4 w-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      </div>
+                      
+                      {/* Dropdown */}
+                      {showAccountDropdown && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {(() => {
+                            const filteredAccounts = (accountsData || [])
+                              .filter((account: BankAccount) => account.currency === 'TOMAN')
+                              .filter((account: BankAccount) => {
+                                const searchLower = accountSearchTerm.toLowerCase()
+                                const last5Digits = account.account_number.slice(-5)
+                                return (
+                                  (account.counterpart_name || '').toLowerCase().includes(searchLower) ||
+                                  account.bank_name.toLowerCase().includes(searchLower) ||
+                                  account.account_number.toLowerCase().includes(searchLower) ||
+                                  last5Digits.includes(searchLower)
+                                )
+                              })
+
+                            if (filteredAccounts.length === 0) {
+                              return (
+                                <div className="p-3 text-gray-500 text-center">
+                                  No accounts found
+                                </div>
+                              )
+                            }
+
+                            return filteredAccounts.map((account: BankAccount) => (
+                              <button
+                                key={account.id}
+                                type="button"
+                                className="w-full text-left p-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                                onClick={() => {
+                                  setFormData({ ...formData, receiver_account_id: account.id })
+                                  setAccountSearchTerm('')
+                                  setShowAccountDropdown(false)
+                                }}
+                              >
+                                <div className="font-medium text-gray-900">
+                                  {account.counterpart_name}
+                                </div>
+                                <div className="text-sm text-gray-600 mt-1">
+                                  {account.bank_name} • ...{account.account_number.slice(-5)}
+                                </div>
+                              </button>
+                            ))
+                          })()}
+                        </div>
+                      )}
+                      
+                      {/* Click outside to close dropdown */}
+                      {showAccountDropdown && (
+                        <div 
+                          className="fixed inset-0 z-5" 
+                          onClick={() => setShowAccountDropdown(false)}
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tracking Number for TOMAN */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <Receipt className="h-4 w-4 inline mr-1" />
+                      Tracking Number *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Enter tracking number (e.g., 12345)"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={formData.tracking_last_5}
+                      onChange={(e) => setFormData({ ...formData, tracking_last_5: e.target.value })}
+                      required
+                      maxLength={20}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Enter the tracking number for this transfer</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* AED Receipt Fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <Users className="h-4 w-4 inline mr-1" />
+                        Receipt Type *
+                      </label>
+                      <select
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        value={formData.receipt_type}
+                        onChange={(e) => setFormData({ ...formData, receipt_type: e.target.value as 'pay' | 'receive' })}
+                        required
+                      >
+                        <option value="pay">Pay (Agrivex pays to individual)</option>
+                        <option value="receive">Receive (Individual pays to Agrivex)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <Users className="h-4 w-4 inline mr-1" />
+                        Trading Party *
+                      </label>
+                      <select
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        value={formData.trading_party_id}
+                        onChange={(e) => setFormData({ ...formData, trading_party_id: parseInt(e.target.value) })}
+                        required
+                      >
+                        <option value={0}>Select trading party</option>
+                        {(partiesData || []).map((party: TradingParty) => (
+                          <option key={party.id} value={party.id}>
+                            {party.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <UserCheck className="h-4 w-4 inline mr-1" />
+                      Individual Name *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Name of person handling cash collection/payment"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                      value={formData.individual_name}
+                      onChange={(e) => setFormData({ ...formData, individual_name: e.target.value })}
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Name of the individual who collected/paid cash</p>
+                  </div>
+                </>
+              )}
+
+              {/* Common Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* Amount */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <DollarSign className="h-4 w-4 inline mr-1" />
+                    Amount {receiptType === 'AED' ? '(AED)' : '(TOMAN)'} *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={receiptType === 'TOMAN' ? '1,000,000' : '1,000'}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={formData.amount}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/,/g, '')
+                      if (/^\d*$/.test(value)) {
+                        setFormData({ ...formData, amount: value ? parseInt(value).toLocaleString() : '' })
+                      }
+                    }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Calendar className="h-4 w-4 inline mr-1" />
+                  Receipt Date *
+                </label>
+                <input
+                  type="date"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={formData.receipt_date}
+                  onChange={(e) => setFormData({ ...formData, receipt_date: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <FileText className="h-4 w-4 inline mr-1" />
+                  Notes (Optional)
+                </label>
+                <textarea
+                  placeholder="Add any additional notes about this receipt..."
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  rows={3}
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
+                <button
+                  type="button"
+                  className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  onClick={() => {
+                    resetForm()
+                    setShowEditModal(false)
+                    setReceiptToEdit(null)
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className={`px-6 py-3 ${receiptType === 'TOMAN' 
+                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800' 
+                    : 'bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800'
+                  } text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50`}
+                  disabled={editReceiptMutation.isPending}
+                >
+                  {editReceiptMutation.isPending ? 'Updating...' : `Update ${receiptType} Receipt`}
                 </button>
               </div>
             </form>

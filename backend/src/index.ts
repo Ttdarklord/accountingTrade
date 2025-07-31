@@ -15,6 +15,7 @@ import dashboardRouter from './routes/dashboard';
 import journalRouter from './routes/journal';
 import settlementsRouter from './routes/settlements';
 import authRouter from './routes/auth';
+import notificationsRouter from './routes/notifications';
 
 // Import middleware
 import { optionalAuth } from './middleware/auth';
@@ -103,6 +104,7 @@ app.use('/api/counterparts', counterpartsRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/journal', journalRouter);
 app.use('/api/settlements', settlementsRouter);
+app.use('/api/notifications', notificationsRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {
