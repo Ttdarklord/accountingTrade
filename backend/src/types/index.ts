@@ -192,6 +192,8 @@ export interface CounterpartStatementLine {
   // Joined data
   trade_number?: string;
   tracking_last_5?: string;
+  bank_name?: string;
+  account_number?: string;
 }
 
 export interface JournalEntry {

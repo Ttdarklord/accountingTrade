@@ -49,6 +49,8 @@ interface StatementLine {
   created_at: string
   trade_number?: string
   tracking_last_5?: string
+  bank_name?: string
+  account_number?: string
 }
 
 export default function Counterparts() {
@@ -214,10 +216,22 @@ export default function Counterparts() {
             .replace(/Payment for trade /gi, 'Trade ')
             .replace(/Trade obligation for trade /gi, 'Trade ')
           
+          // Add bank and tracking info for TOMAN receipts
+          let enhancedDescription = description;
+          if (line.transaction_type === 'RECEIPT' && selectedCurrency === 'TOMAN') {
+            const bankInfo = line.bank_name ? `${line.bank_name}` : '';
+            const accountInfo = line.account_number ? `...${line.account_number.slice(-5)}` : '';
+            const trackingInfo = line.tracking_last_5 ? `...${line.tracking_last_5}` : '';
+            
+            if (bankInfo || accountInfo || trackingInfo) {
+              enhancedDescription += ` [${[bankInfo, accountInfo, trackingInfo].filter(Boolean).join(' | ')}]`;
+            }
+          }
+          
           return [
             date,
             line.transaction_type,
-            description,
+            enhancedDescription,
             line.debit_amount > 0 ? formatAmount(line.debit_amount) : '—',
             line.credit_amount > 0 ? formatAmount(line.credit_amount) : '—',
             formatAmount(line.balance_after)
@@ -638,6 +652,11 @@ export default function Counterparts() {
                                     {line.tracking_last_5 && (
                                       <div className="text-xs text-base-content/60 mt-1">
                                         Tracking: ...{line.tracking_last_5}
+                                      </div>
+                                    )}
+                                    {line.bank_name && line.account_number && (
+                                      <div className="text-xs text-base-content/60 mt-1">
+                                        Bank: {line.bank_name} (...{line.account_number.slice(-5)})
                                       </div>
                                     )}
                                   </div>

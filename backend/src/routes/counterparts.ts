@@ -77,10 +77,13 @@ router.get('/:id/statement', async (req, res) => {
       SELECT 
         csl.*,
         t.trade_number,
-        pr.tracking_last_5
+        pr.tracking_last_5,
+        ba.bank_name,
+        ba.account_number
       FROM counterpart_statement_lines csl
       LEFT JOIN trades t ON csl.trade_id = t.id
       LEFT JOIN payment_receipts pr ON csl.receipt_id = pr.id
+      LEFT JOIN bank_accounts ba ON pr.receiver_account_id = ba.id
       WHERE csl.counterpart_id = ? AND csl.currency = ?
     `;
     const params: any[] = [counterpartId, currency];
@@ -114,15 +117,18 @@ router.get('/:id/statement', async (req, res) => {
     
     // Handle CSV format request
     if (format === 'csv') {
-      const csvHeader = 'Date,Type,Description,Debit,Credit,Balance\n';
+      const csvHeader = 'Date,Type,Description,Bank,Account,Tracking,Debit,Credit,Balance\n';
       const csvRows = lines.map(line => {
         const date = new Date(line.transaction_date).toLocaleDateString();
         const description = line.description.replace(/,/g, ';'); // Replace commas to avoid CSV issues
+        const bankInfo = (line as any).bank_name || '';
+        const accountLast5 = (line as any).account_number ? `...${(line as any).account_number.slice(-5)}` : '';
+        const tracking = line.tracking_last_5 ? `...${line.tracking_last_5}` : '';
         const debit = line.debit_amount || '';
         const credit = line.credit_amount || '';
         const balance = line.balance_after;
         
-        return `${date},${line.transaction_type},"${description}",${debit},${credit},${balance}`;
+        return `${date},${line.transaction_type},"${description}","${bankInfo}","${accountLast5}","${tracking}",${debit},${credit},${balance}`;
       }).join('\n');
       
       const csvContent = csvHeader + csvRows;

@@ -903,4 +903,226 @@ router.put('/:id/restore', async (req, res) => {
   }
 });
 
+// PUT /api/receipts/:id/edit - Edit a receipt with proper accounting adjustments
+router.put('/:id/edit', async (req, res) => {
+  try {
+    const receiptId = parseInt(req.params.id);
+    const validatedData = createReceiptSchema.parse(req.body);
+    
+    // Get the existing receipt
+    const existingReceipt = db.prepare(`
+      SELECT pr.*, ba.counterpart_id as receiver_counterpart_id
+      FROM payment_receipts pr
+      LEFT JOIN bank_accounts ba ON pr.receiver_account_id = ba.id
+      WHERE pr.id = ? AND (pr.is_deleted IS NULL OR pr.is_deleted = 0)
+    `).get(receiptId) as any;
+    
+    if (!existingReceipt) {
+      return res.status(404).json({
+        success: false,
+        error: 'Payment receipt not found or already deleted'
+      });
+    }
+    
+    // Validate currency hasn't changed
+    if (existingReceipt.currency !== validatedData.currency) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot change receipt currency'
+      });
+    }
+    
+    // Validate counterparts based on receipt type
+    let payer: any = null;
+    let receiverAccount: any = null;
+    let tradingParty: any = null;
+    
+    if (validatedData.currency === 'TOMAN') {
+      payer = db.prepare('SELECT * FROM trading_parties WHERE id = ?').get(validatedData.payer_id!) as any;
+      if (!payer) {
+        return res.status(400).json({
+          success: false,
+          error: 'Payer not found'
+        });
+      }
+      
+      receiverAccount = db.prepare(`
+        SELECT ba.*, tp.name as counterpart_name
+        FROM bank_accounts ba
+        LEFT JOIN trading_parties tp ON ba.counterpart_id = tp.id
+        WHERE ba.id = ?
+      `).get(validatedData.receiver_account_id!) as any;
+      
+      if (!receiverAccount) {
+        return res.status(400).json({
+          success: false,
+          error: 'Receiver bank account not found'
+        });
+      }
+      
+      if (!receiverAccount.is_active) {
+        return res.status(400).json({
+          success: false,
+          error: 'Receiver bank account is not active'
+        });
+      }
+    } else {
+      tradingParty = db.prepare('SELECT * FROM trading_parties WHERE id = ?').get(validatedData.trading_party_id!) as any;
+      if (!tradingParty) {
+        return res.status(400).json({
+          success: false,
+          error: 'Trading party not found'
+        });
+      }
+    }
+    
+    try {
+      db.exec('BEGIN TRANSACTION');
+      
+      const updateTime = new Date().toISOString();
+      const description = `Receipt #${receiptId} Updated`;
+      
+      // Calculate the amount difference
+      const amountDifference = validatedData.amount - existingReceipt.amount;
+      
+      // If amount changed, update counterpart balances
+      if (amountDifference !== 0) {
+        if (existingReceipt.currency === 'TOMAN') {
+          // Update payer balance (difference in what they paid)
+          updateCounterpartBalance(
+            validatedData.payer_id!,
+            'TOMAN',
+            amountDifference, // positive = credit (they paid more), negative = debit (they paid less)
+            'RECEIPT',
+            description + ' - Amount adjustment',
+            validatedData.receipt_date,
+            undefined,
+            receiptId,
+            false
+          );
+          
+          // Update receiver balance if there's a valid receiver counterpart
+          if (receiverAccount.counterpart_id) {
+            updateCounterpartBalance(
+              receiverAccount.counterpart_id,
+              'TOMAN',
+              -amountDifference, // opposite of payer
+              'RECEIPT',
+              description + ' - Amount adjustment',
+              validatedData.receipt_date,
+              undefined,
+              receiptId,
+              false
+            );
+          }
+        } else {
+          // AED receipt - update company balance
+          const multiplier = validatedData.receipt_type === 'receive' ? 1 : -1;
+          const stmt = db.prepare(`
+            UPDATE company_balances 
+            SET safe_balance = safe_balance + ? 
+            WHERE currency = 'AED'
+          `);
+          stmt.run(amountDifference * multiplier);
+        }
+      }
+      
+      // Update the receipt
+      const updateStmt = db.prepare(`
+        UPDATE payment_receipts 
+        SET 
+          payer_id = ?,
+          receiver_account_id = ?,
+          tracking_last_5 = ?,
+          amount = ?,
+          receipt_date = ?,
+          notes = ?,
+          receipt_type = ?,
+          trading_party_id = ?,
+          individual_name = ?,
+          updated_at = ?
+        WHERE id = ?
+      `);
+      
+      updateStmt.run(
+        validatedData.payer_id || null,
+        validatedData.receiver_account_id || null,
+        validatedData.tracking_last_5,
+        validatedData.amount,
+        validatedData.receipt_date,
+        validatedData.notes || null,
+        validatedData.receipt_type || null,
+        validatedData.trading_party_id || null,
+        validatedData.individual_name || null,
+        updateTime,
+        receiptId
+      );
+      
+      // Update journal entry
+      const journalUpdateStmt = db.prepare(`
+        UPDATE journal_entries 
+        SET description = ?, entry_date = ?
+        WHERE receipt_id = ?
+      `);
+      
+      const newDescription = validatedData.currency === 'TOMAN' 
+        ? `Receipt: ${payer.name} paid ${validatedData.amount.toLocaleString()} Toman to ${receiverAccount.counterpart_name}`
+        : `Receipt: ${validatedData.receipt_type} ${validatedData.amount.toLocaleString()} AED ${validatedData.receipt_type === 'pay' ? 'to' : 'from'} ${validatedData.individual_name} (${tradingParty.name})`;
+      
+      journalUpdateStmt.run(newDescription, validatedData.receipt_date, receiptId);
+      
+      db.exec('COMMIT');
+      
+      // Re-process settlements if this affects them
+      try {
+        SettlementService.processReceipt(receiptId);
+      } catch (settlementError) {
+        console.error('Settlement processing failed (receipt still updated):', settlementError);
+      }
+      
+      // Get the updated receipt
+      const updatedReceipt = db.prepare(`
+        SELECT 
+          pr.*,
+          tp_payer.name as payer_name,
+          tp_trading.name as trading_party_name,
+          ba.account_number as receiver_account_number,
+          ba.bank_name as receiver_bank_name,
+          receiver_tp.name as receiver_counterpart_name
+        FROM payment_receipts pr
+        LEFT JOIN trading_parties tp_payer ON pr.payer_id = tp_payer.id
+        LEFT JOIN trading_parties tp_trading ON pr.trading_party_id = tp_trading.id
+        LEFT JOIN bank_accounts ba ON pr.receiver_account_id = ba.id
+        LEFT JOIN trading_parties receiver_tp ON ba.counterpart_id = receiver_tp.id
+        WHERE pr.id = ?
+      `).get(receiptId) as any;
+      
+      res.json({
+        success: true,
+        data: updatedReceipt,
+        message: 'Receipt updated successfully'
+      });
+      
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
+    
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation error',
+        details: error.errors
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update payment receipt',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router; 

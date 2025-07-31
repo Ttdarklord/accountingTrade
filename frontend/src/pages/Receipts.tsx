@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Filter, Receipt, Eye, Banknote, DollarSign, Users, X, Archive, CheckCircle, CreditCard, UserCheck, Calendar, FileText } from 'lucide-react'
+import { Plus, Search, Filter, Receipt, Eye, Banknote, DollarSign, Users, X, Archive, CheckCircle, CreditCard, UserCheck, Calendar, FileText, Edit as EditIcon } from 'lucide-react'
 import { api } from '../lib/api'
 import { format } from 'date-fns'
 
@@ -61,7 +61,9 @@ interface BankAccount {
 export default function Receipts() {
   const [searchTerm, setSearchTerm] = useState('')
   const [showModal, setShowModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
   const [selectedReceipt, setSelectedReceipt] = useState<PaymentReceipt | null>(null)
+  const [receiptToEdit, setReceiptToEdit] = useState<PaymentReceipt | null>(null)
   const [receiptType, setReceiptType] = useState<'TOMAN' | 'AED'>('TOMAN')
   const [currencyFilter, setCurrencyFilter] = useState<'ALL' | 'TOMAN' | 'AED'>('ALL')
   const [accountSearchTerm, setAccountSearchTerm] = useState('')
@@ -187,6 +189,29 @@ export default function Receipts() {
       setReceiptToRestore(null)
       setRestoreReason('')
     },
+  })
+
+  // Edit receipt mutation
+  const editReceiptMutation = useMutation({
+    mutationFn: async ({ receiptId, data }: { receiptId: number, data: any }) => {
+      const response = await api.put(`/receipts/${receiptId}/edit`, data)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['receipts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['trades'] })
+      queryClient.invalidateQueries({ queryKey: ['counterparts'] })
+      setShowEditModal(false)
+      setReceiptToEdit(null)
+      resetForm()
+      alert('Receipt updated successfully!')
+    },
+    onError: (error: any) => {
+      console.error('Error updating receipt:', error)
+      const errorMessage = error.response?.data?.error || error.message || 'Unknown error occurred'
+      alert(`Failed to update receipt: ${errorMessage}`)
+    }
   })
 
   const resetForm = () => {
@@ -639,13 +664,24 @@ export default function Receipts() {
                   </div>
 
                   <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
-                    <button
-                      onClick={() => setSelectedReceipt(receipt)}
-                      className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center space-x-1"
-                    >
-                      <Eye className="h-4 w-4" />
-                      <span>View Details</span>
-                    </button>
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => setSelectedReceipt(receipt)}
+                        className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center space-x-1"
+                      >
+                        <Eye className="h-4 w-4" />
+                        <span>View</span>
+                      </button>
+                      {viewMode === 'active' && (
+                        <button
+                          onClick={() => handleEdit(receipt)}
+                          className="text-green-600 hover:text-green-700 text-sm font-medium flex items-center space-x-1"
+                        >
+                          <EditIcon className="h-4 w-4" />
+                          <span>Edit</span>
+                        </button>
+                      )}
+                    </div>
                     {viewMode === 'active' ? (
                       <button
                         onClick={() => handleDelete(receipt)}
