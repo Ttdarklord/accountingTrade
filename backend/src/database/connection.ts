@@ -16,9 +16,10 @@ if (!fs.existsSync(dataDir)) {
   console.log(`📁 Created data directory: ${dataDir}`);
 }
 
-// Create database connection
+// Create database connection with production safety
 const database = new Database(dbPath, {
-  verbose: process.env.NODE_ENV === 'development' ? console.log : undefined
+  verbose: process.env.NODE_ENV === 'development' ? console.log : undefined,
+  timeout: process.env.NODE_ENV === 'production' ? 30000 : 60000 // 30s in production, 60s in dev
 });
 
 // Enable foreign key constraints

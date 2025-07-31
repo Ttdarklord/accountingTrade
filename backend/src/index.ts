@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import runMigrations from './database/migrate';
+import runSimpleMigrations from './database/migrate-simple';
 
 // Import routes
 import tradesRouter from './routes/trades';
@@ -38,8 +39,14 @@ if (process.env.NODE_ENV === 'production') {
   console.log('🔧 Running in development mode');
 }
 
-// Initialize database
-runMigrations();
+// Initialize database - use simple migrations in production to prevent hanging
+if (process.env.NODE_ENV === 'production') {
+  console.log('🔄 Using simple migrations for production deployment');
+  runSimpleMigrations();
+} else {
+  console.log('🔄 Using full migrations for development');
+  runMigrations();
+}
 
 // Security and parsing middleware
 app.use(helmet());
