@@ -1013,35 +1013,105 @@ router.put('/:id/edit', async (req, res) => {
       // Calculate the amount difference
       const amountDifference = validatedData.amount - existingReceipt.amount;
       
-      // If amount changed, update counterpart balances
+      // If amount changed, update the original statement lines instead of creating new ones
       if (amountDifference !== 0) {
         if (existingReceipt.currency === 'TOMAN') {
-          // Update payer balance (difference in what they paid)
-          updateCounterpartBalance(
-            validatedData.payer_id!,
-            'TOMAN',
-            amountDifference, // positive = credit (they paid more), negative = debit (they paid less)
-            'RECEIPT',
-            description + ' - Amount adjustment',
-            validatedData.receipt_date,
-            undefined,
-            receiptId,
-            false
-          );
+          // Update the original payer statement line
+          const payerStatementLine = db.prepare(`
+            SELECT * FROM counterpart_statement_lines 
+            WHERE receipt_id = ? AND counterpart_id = ?
+          `).get(receiptId, validatedData.payer_id) as any;
+          
+          if (payerStatementLine) {
+            // Update the credit amount and recalculate balance
+            const newCreditAmount = payerStatementLine.credit_amount + amountDifference;
+            const newBalanceAfter = payerStatementLine.balance_after + amountDifference;
+            
+            db.prepare(`
+              UPDATE counterpart_statement_lines 
+              SET credit_amount = ?, balance_after = ?, description = ?
+              WHERE id = ?
+            `).run(
+              newCreditAmount,
+              newBalanceAfter, 
+              `Receipt: ${payer.name} paid ${validatedData.amount.toLocaleString()} Toman (Updated)`,
+              payerStatementLine.id
+            );
+            
+            // Update counterpart balance
+            db.prepare(`
+              UPDATE counterpart_balances 
+              SET balance = balance + ? 
+              WHERE counterpart_id = ? AND currency = 'TOMAN'
+            `).run(amountDifference, validatedData.payer_id);
+            
+            // Recalculate subsequent statement line balances for this counterpart
+            const subsequentLines = db.prepare(`
+              SELECT * FROM counterpart_statement_lines 
+              WHERE counterpart_id = ? AND currency = 'TOMAN' 
+              AND transaction_date > ? 
+              ORDER BY transaction_date, created_at
+            `).all(validatedData.payer_id, payerStatementLine.transaction_date) as any[];
+            
+            let runningBalance = newBalanceAfter;
+            for (const line of subsequentLines) {
+              runningBalance = runningBalance + (line.credit_amount || 0) - (line.debit_amount || 0);
+              db.prepare(`
+                UPDATE counterpart_statement_lines 
+                SET balance_after = ? 
+                WHERE id = ?
+              `).run(runningBalance, line.id);
+            }
+          }
           
           // Update receiver balance if there's a valid receiver counterpart
           if (receiverAccount.counterpart_id) {
-            updateCounterpartBalance(
-              receiverAccount.counterpart_id,
-              'TOMAN',
-              -amountDifference, // opposite of payer
-              'RECEIPT',
-              description + ' - Amount adjustment',
-              validatedData.receipt_date,
-              undefined,
-              receiptId,
-              false
-            );
+            const receiverStatementLine = db.prepare(`
+              SELECT * FROM counterpart_statement_lines 
+              WHERE receipt_id = ? AND counterpart_id = ?
+            `).get(receiptId, receiverAccount.counterpart_id) as any;
+            
+            if (receiverStatementLine) {
+              // Update the debit amount and recalculate balance
+              const newDebitAmount = receiverStatementLine.debit_amount - amountDifference;
+              const newBalanceAfter = receiverStatementLine.balance_after - amountDifference;
+              
+              db.prepare(`
+                UPDATE counterpart_statement_lines 
+                SET debit_amount = ?, balance_after = ?, description = ?
+                WHERE id = ?
+              `).run(
+                newDebitAmount,
+                newBalanceAfter,
+                `Receipt: Payment to ${receiverAccount.counterpart_name} (Updated)`,
+                receiverStatementLine.id
+              );
+              
+              // Update counterpart balance
+              db.prepare(`
+                UPDATE counterpart_balances 
+                SET balance = balance - ? 
+                WHERE counterpart_id = ? AND currency = 'TOMAN'
+              `).run(amountDifference, receiverAccount.counterpart_id);
+              
+              // Recalculate subsequent statement line balances for receiver
+              const subsequentLines = db.prepare(`
+                SELECT * FROM counterpart_statement_lines 
+                WHERE counterpart_id = ? AND currency = 'TOMAN' 
+                AND transaction_date > ? 
+                ORDER BY transaction_date, created_at
+              `).all(receiverAccount.counterpart_id, receiverStatementLine.transaction_date) as any[];
+              
+              let runningBalance = newBalanceAfter;
+              for (const line of subsequentLines) {
+                runningBalance = runningBalance + (line.credit_amount || 0) - (line.debit_amount || 0);
+                db.prepare(`
+                  UPDATE counterpart_statement_lines 
+                  SET balance_after = ? 
+                  WHERE id = ?
+                `).run(runningBalance, line.id);
+              }
+            }
           }
         } else {
           // AED receipt - update company balance

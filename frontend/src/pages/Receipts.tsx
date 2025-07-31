@@ -68,6 +68,7 @@ export default function Receipts() {
   const [currencyFilter, setCurrencyFilter] = useState<'ALL' | 'TOMAN' | 'AED'>('ALL')
   const [accountSearchTerm, setAccountSearchTerm] = useState('')
   const [showAccountDropdown, setShowAccountDropdown] = useState(false)
+  const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null)
   // Form state for creating new receipts
   const [formData, setFormData] = useState({
     // Common fields
@@ -228,6 +229,7 @@ export default function Receipts() {
     })
     setAccountSearchTerm('')
     setShowAccountDropdown(false)
+    setSelectedAccount(null)
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -299,6 +301,15 @@ export default function Receipts() {
     setReceiptToEdit(receipt)
     setReceiptType(receipt.currency as 'TOMAN' | 'AED')
     
+    // For TOMAN receipts, find and set the selected account
+    if (receipt.currency === 'TOMAN' && receipt.receiver_account_id && accountsData) {
+      const account = accountsData.find((acc: BankAccount) => acc.id === receipt.receiver_account_id)
+      if (account) {
+        setSelectedAccount(account)
+        setAccountSearchTerm(`${account.counterpart_name} - ${account.bank_name}`)
+      }
+    }
+    
     // Populate form with existing data
     setFormData({
       amount: receipt.amount.toLocaleString(),
@@ -365,8 +376,7 @@ export default function Receipts() {
     return matchesSearch && matchesCurrency
   })
 
-  // Get receiver account details for form
-  const selectedAccount = accountsData?.find((acc: BankAccount) => acc.id === formData.receiver_account_id)
+  // selectedAccount is managed as state for both creation and editing
 
   // Calculate stats by currency
   const tomanReceipts = (receiptsData || []).filter((r: PaymentReceipt) => !r.currency || r.currency === 'TOMAN')
@@ -1256,6 +1266,7 @@ export default function Receipts() {
                                 className="w-full text-left p-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
                                 onClick={() => {
                                   setFormData({ ...formData, receiver_account_id: account.id })
+                                  setSelectedAccount(account)
                                   setAccountSearchTerm('')
                                   setShowAccountDropdown(false)
                                 }}
